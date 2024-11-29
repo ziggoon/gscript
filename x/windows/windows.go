@@ -352,9 +352,12 @@ func InjectShellcode(pid_int int, payload []byte) error {
 
 func IsAdmin() (bool, error) {
 	var token windows.Token
-	process := windows.CurrentProcess()
+	process, err := windows.GetCurrentProcess()
+	if err != nil {
+		return false, err
+	}
 
-	err := windows.OpenProcessToken(process, windows.TOKEN_QUERY, &token)
+	err = windows.OpenProcessToken(process, windows.TOKEN_QUERY, &token)
 	if err != nil {
 		return false, err
 	}
