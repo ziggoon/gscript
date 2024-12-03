@@ -1,19 +1,19 @@
-//go:build windows
-// +build windows
+//go:build win
+// +build win
 
 package windows
 
 import (
 	"errors"
 	"fmt"
-	"golang.org/x/sys/windows"
+	win "golang.org/x/sys/windows"
 	"strings"
 	"syscall"
 	"time"
 	"unsafe"
 
 	"github.com/mitchellh/go-ps"
-	"golang.org/x/sys/windows/registry"
+	"golang.org/x/sys/win/registry"
 )
 
 const (
@@ -160,8 +160,8 @@ type KrbCredInfo struct {
 }
 
 type TokenStatistics struct {
-	TokenID            windows.LUID
-	AuthenticationId   windows.LUID
+	TokenID            win.LUID
+	AuthenticationId   win.LUID
 	ExpirationTime     int64
 	TokenType          uint32
 	ImpersonationLevel uint32
@@ -169,12 +169,12 @@ type TokenStatistics struct {
 	DynamicAvailable   uint32
 	GroupCount         uint32
 	PrivilegeCount     uint32
-	ModifiedId         windows.LUID
+	ModifiedId         win.LUID
 }
 
 type SecurityLogonSessionData struct {
 	Size                  uint32
-	LoginID               windows.LUID
+	LoginID               win.LUID
 	Username              LsaString
 	LoginDomain           LsaString
 	AuthenticationPackage LsaString
@@ -211,13 +211,13 @@ type LsaString struct {
 }
 
 type LogonSessionData struct {
-	LogonID               windows.LUID
+	LogonID               win.LUID
 	Username              string
 	LogonDomain           string
 	AuthenticationPackage string
 	LogonType             LogonType
 	Session               int32
-	Sid                   *windows.SID
+	Sid                   *win.SID
 	LogonTime             time.Time
 	LogonServer           string
 	DnsDomainName         string
@@ -227,7 +227,7 @@ type LogonSessionData struct {
 type KerbQueryTktCacheRequest struct {
 	MessageType KerbProtocolMessageType
 	_           uint32
-	LogonId     windows.LUID
+	LogonId     win.LUID
 }
 
 type QueryTktCacheResponse struct {
@@ -251,7 +251,7 @@ type KerbTicketCacheInfoEx struct {
 type KerbRetrieveTktRequest struct {
 	MessageType    KerbProtocolMessageType
 	_              uint32
-	LogonId        windows.LUID
+	LogonId        win.LUID
 	TicketFlags    uint32
 	CacheOptions   uint32
 	EncryptionType int64
@@ -295,7 +295,7 @@ const (
 
 // dll imports
 var (
-	secur32                        = windows.NewLazyDLL("secur32.dll")
+	secur32                        = win.NewLazyDLL("secur32.dll")
 	LsaConnectUntrusted            = secur32.NewProc("LsaConnectUntrusted")
 	LsaLookupAuthenticationPackage = secur32.NewProc("LsaLookupAuthenticationPackage")
 	LsaCallAuthenticationPackage   = secur32.NewProc("LsaCallAuthenticationPackage")
@@ -326,7 +326,7 @@ type RegistryRetValue struct {
 }
 
 const (
-	windowsToUnixEpochIntervals = 116444736000000000
+	winToUnixEpochIntervals = 116444736000000000
 )
 
 /*
@@ -345,7 +345,7 @@ func lookUpKey(keyString string) (registry.Key, error) {
 misc helper funcs
 */
 func fileTimeToTime(fileTime int64) time.Time {
-	nsec := (fileTime - windowsToUnixEpochIntervals) * 100
+	nsec := (fileTime - winToUnixEpochIntervals) * 100
 	return time.Unix(0, nsec).Local()
 }
 
@@ -369,10 +369,10 @@ func lsaStrToString(s LsaString) string {
 	}
 	buf := make([]uint16, s.Length/2)
 	copy(buf, (*[1 << 30]uint16)(unsafe.Pointer(s.Buffer))[:s.Length/2])
-	return windows.UTF16ToString(buf)
+	return win.UTF16ToString(buf)
 }
 
-func enumerateLogonSessions() ([]windows.LUID, error) {
+func enumerateLogonSessions() ([]win.LUID, error) {
 	var count uint32
 	var luids uintptr
 
@@ -385,9 +385,9 @@ func enumerateLogonSessions() ([]windows.LUID, error) {
 		return nil, fmt.Errorf("LsaEnumerateLogonSessions failed with error: 0x%x", ret)
 	}
 
-	luidSlice := make([]windows.LUID, count)
+	luidSlice := make([]win.LUID, count)
 	for i := uint32(0); i < count; i++ {
-		luid := (*windows.LUID)(unsafe.Pointer(luids + uintptr(i)*unsafe.Sizeof(windows.LUID{})))
+		luid := (*win.LUID)(unsafe.Pointer(luids + uintptr(i)*unsafe.Sizeof(win.LUID{})))
 		luidSlice[i] = *luid
 	}
 
@@ -396,26 +396,26 @@ func enumerateLogonSessions() ([]windows.LUID, error) {
 	return luidSlice, nil
 }
 
-func getCurrentLUID() (windows.LUID, error) {
-	var currentToken windows.Token
-	err := windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_QUERY, &currentToken)
+func getCurrentLUID() (win.LUID, error) {
+	var currentToken win.Token
+	err := win.OpenProcessToken(win.CurrentProcess(), win.TOKEN_QUERY, &currentToken)
 	if err != nil {
-		return windows.LUID{}, fmt.Errorf("OpenProcessToken failed with error: %v", err)
+		return win.LUID{}, fmt.Errorf("OpenProcessToken failed with error: %v", err)
 	}
 	defer currentToken.Close()
 
 	var tokenStats TokenStatistics
 	var returnLength uint32
 
-	err = windows.GetTokenInformation(currentToken, windows.TokenStatistics, (*byte)(unsafe.Pointer(&tokenStats)), uint32(unsafe.Sizeof(tokenStats)), &returnLength)
+	err = win.GetTokenInformation(currentToken, win.TokenStatistics, (*byte)(unsafe.Pointer(&tokenStats)), uint32(unsafe.Sizeof(tokenStats)), &returnLength)
 	if err != nil {
-		return windows.LUID{}, fmt.Errorf("GetTokenInformation failed with error: %v", err)
+		return win.LUID{}, fmt.Errorf("GetTokenInformation failed with error: %v", err)
 	}
 
 	return tokenStats.AuthenticationId, nil
 }
 
-func getLogonSessionData(luid windows.LUID) (*LogonSessionData, error) {
+func getLogonSessionData(luid win.LUID) (*LogonSessionData, error) {
 	var sessionDataPtr uintptr
 
 	ret, _, _ := LsaGetLogonSessionData.Call(
@@ -446,10 +446,10 @@ func getLogonSessionData(luid windows.LUID) (*LogonSessionData, error) {
 
 	if sessionData.PSiD != 0 {
 		var sidStr *uint16
-		err := windows.ConvertSidToStringSid((*windows.SID)(unsafe.Pointer(sessionData.PSiD)), &sidStr)
+		err := win.ConvertSidToStringSid((*win.SID)(unsafe.Pointer(sessionData.PSiD)), &sidStr)
 		if err == nil {
-			result.Sid, _ = windows.StringToSid(windows.UTF16PtrToString(sidStr))
-			windows.LocalFree(windows.Handle(unsafe.Pointer(sidStr)))
+			result.Sid, _ = win.StringToSid(win.UTF16PtrToString(sidStr))
+			win.LocalFree(win.Handle(unsafe.Pointer(sidStr)))
 		}
 	}
 
@@ -457,13 +457,13 @@ func getLogonSessionData(luid windows.LUID) (*LogonSessionData, error) {
 }
 
 func isAdmin() (bool, error) {
-	var token windows.Token
-	process, err := windows.GetCurrentProcess()
+	var token win.Token
+	process, err := win.GetCurrentProcess()
 	if err != nil {
 		return false, fmt.Errorf("GetCurrentProcess failed with error: %v", err)
 	}
 
-	err = windows.OpenProcessToken(process, windows.TOKEN_QUERY, &token)
+	err = win.OpenProcessToken(process, win.TOKEN_QUERY, &token)
 	if err != nil {
 		return false, fmt.Errorf("OpenProcessToken failed with error: %v", err)
 	}
@@ -471,7 +471,7 @@ func isAdmin() (bool, error) {
 
 	var elevated uint32
 	var size uint32
-	err = windows.GetTokenInformation(token, windows.TokenElevation, (*byte)(unsafe.Pointer(&elevated)), uint32(unsafe.Sizeof(elevated)), &size)
+	err = win.GetTokenInformation(token, win.TokenElevation, (*byte)(unsafe.Pointer(&elevated)), uint32(unsafe.Sizeof(elevated)), &size)
 	if err != nil {
 		return false, fmt.Errorf("GetTokenInformation failed with error: %v", err)
 	}
@@ -781,7 +781,7 @@ func NewLSAString(s string) *LsaString {
 	}
 }
 
-func ExtractTicket(lsaHandle windows.Handle, authPackage uint32, luid windows.LUID, targetName string) (*KrbCred, error) {
+func ExtractTicket(lsaHandle win.Handle, authPackage uint32, luid win.LUID, targetName string) (*KrbCred, error) {
 	if lsaHandle == 0 {
 		return nil, fmt.Errorf("invalid LSA handle")
 	}
@@ -794,7 +794,7 @@ func ExtractTicket(lsaHandle windows.Handle, authPackage uint32, luid windows.LU
 		EncryptionType: 0,
 	}
 
-	utf16Bytes := windows.StringToUTF16(targetName)
+	utf16Bytes := win.StringToUTF16(targetName)
 	length := uint16(len(targetName) * 2)
 	maxLength := length + 2
 
@@ -867,8 +867,8 @@ func ExtractTicket(lsaHandle windows.Handle, authPackage uint32, luid windows.LU
 	return nil, fmt.Errorf("KRB_RETRIEVE_TKT_RESPONSE failed")
 }
 
-func EnumerateTickets(lsaHandle windows.Handle, authPackage uint32) ([]SessionCred, error) {
-	var luids []windows.LUID
+func EnumerateTickets(lsaHandle win.Handle, authPackage uint32) ([]SessionCred, error) {
+	var luids []win.LUID
 	var sessionCreds []SessionCred
 	isAdmin, err := isAdmin()
 	if err != nil {
@@ -914,7 +914,7 @@ func EnumerateTickets(lsaHandle windows.Handle, authPackage uint32) ([]SessionCr
 			ticketCacheRequest.LogonId = sessionData.LogonID
 		} else {
 			// https://github.com/GhostPack/Rubeus/blob/master/Rubeus/lib/LSA.cs#L303
-			ticketCacheRequest.LogonId = windows.LUID{LowPart: 0, HighPart: 0}
+			ticketCacheRequest.LogonId = win.LUID{LowPart: 0, HighPart: 0}
 		}
 
 		ret, _, err := LsaCallAuthenticationPackage.Call(
@@ -986,8 +986,8 @@ func DisplayTickets(sessionCreds []SessionCred) {
 	}
 }
 
-func GetLsaHandle() (windows.Handle, error) {
-	var lsaHandle windows.Handle
+func GetLsaHandle() (win.Handle, error) {
+	var lsaHandle win.Handle
 	ret, _, err := LsaConnectUntrusted.Call(
 		uintptr(unsafe.Pointer(&lsaHandle)),
 	)
@@ -998,7 +998,7 @@ func GetLsaHandle() (windows.Handle, error) {
 	return lsaHandle, nil
 }
 
-func GetAuthenticationPackage(lsaHandle windows.Handle, lsaString *LsaString) (uint32, error) {
+func GetAuthenticationPackage(lsaHandle win.Handle, lsaString *LsaString) (uint32, error) {
 	var authPackage uint32
 
 	ret, _, err := LsaLookupAuthenticationPackage.Call(
