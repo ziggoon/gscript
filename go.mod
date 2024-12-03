@@ -1,7 +1,7 @@
 module github.com/gen0cide/gscript
 
 require (
-	github.com/Jeffail/gabs/v2 v2.5.0
+	github.com/Jeffail/gabs/v2 v2.7.0
 	github.com/ahhh/gopkgs v0.0.0-20180927222900-9e331bbdc80f
 	github.com/chzyer/logex v1.1.10 // indirect
 	github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1 // indirect
@@ -34,7 +34,7 @@ require (
 	github.com/vigneshuvi/GoDateFormat v0.0.0-20190923034126-379ee8a8c45f
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	golang.org/x/crypto v0.0.0-20200510223506-06a226fb4e37 // indirect
-	golang.org/x/sys v0.0.0-20200511232937-7e40ca221e25
+	golang.org/x/sys v0.27.0
 	golang.org/x/tools v0.0.0-20200512001501-aaeff5de670a
 	gopkg.in/VividCortex/ewma.v1 v1.1.1 // indirect
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
