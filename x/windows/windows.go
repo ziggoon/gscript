@@ -13,7 +13,7 @@ import (
 	"unsafe"
 
 	"github.com/mitchellh/go-ps"
-	"golang.org/x/sys/win/registry"
+	"golang.org/x/sys/windows/registry"
 )
 
 const (
